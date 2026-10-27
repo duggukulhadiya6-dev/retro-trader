@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RETRO TRADER — 24/7 Live Micro-Trading</title>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; user-select: none; }
+        body { background: #0b0f19; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; overflow-x: hidden; }
+        .app-container { width: 100%; max-width: 440px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+
+        /* Top Bar */
+        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+        .logo { font-size: 20px; font-weight: 900; letter-spacing: 1px; color: #fff; display: flex; align-items: center; gap: 6px; }
+        .logo span { color: #00ff88; font-size: 14px; }
+        .right-nav { display: flex; align-items: center; gap: 8px; }
+        .fee-badge { background: #131b2e; border: 1px solid #233150; font-size: 11px; padding: 4px 8px; border-radius: 6px; color: #8ba2d0; font-weight: bold; }
+        .menu-btn { background: #182238; border: 1px solid #28395e; color: #fff; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+
+        /* Wallet Box */
+        .wallet-card { background: #131a2b; border: 1px solid #202c47; border-radius: 12px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+        .wallet-bal { font-size: 18px; font-weight: 800; color: #00ff88; }
+        .wallet-btns { display: flex; gap: 6px; }
+        .w-btn { padding: 6px 12px; border-radius: 6px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .dep-btn { background: #00ff88; color: #000; }
+        .with-btn { background: #233150; color: #fff; }
+
+        /* Dial & Stats */
+        .round-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
+        .side-pool { text-align: center; width: 90px; }
+        .side-pool .players { font-size: 10px; color: #7e93b8; }
+        .side-pool .percent { font-size: 18px; font-weight: 800; }
+        .pool-down { color: #ff3366; }
+        .pool-up { color: #00ff88; }
+        
+        .dial-container { display: flex; flex-direction: column; align-items: center; }
+        .dial-circle { width: 54px; height: 54px; border-radius: 50%; border: 3px solid #202c47; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; background: #0e1424; }
+        .dial-sec { font-size: 20px; font-weight: 900; line-height: 1; }
+        .dial-lbl { font-size: 8px; color: #7e93b8; margin-top: 1px; }
+        .phase-badge { margin-top: 4px; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 12px; text-transform: uppercase; }
+        .phase-betting { background: #d97706; color: #fff; }
+        .phase-play { background: #059669; color: #fff; animation: pulse 1s infinite alternate; }
+        @keyframes pulse { from { opacity: 0.85; } to { opacity: 1; filter: drop-shadow(0 0 6px #00ff88); } }
+
+        /* Canvas Stage */
+        .chart-box { position: relative; width: 100%; height: 210px; background: #0c1220; border: 1px solid #1a243a; border-radius: 12px; overflow: hidden; }
+        canvas { width: 100%; height: 100%; display: block; }
+        .cashout-btn { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: #f59e0b; color: #000; font-weight: 900; font-size: 13px; padding: 8px 20px; border-radius: 20px; border: none; cursor: pointer; box-shadow: 0 0 15px rgba(245, 158, 11, 0.6); display: none; z-index: 10; }
+
+        /* History Strip */
+        .history-strip { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; scrollbar-width: none; }
+        .history-strip::-webkit-scrollbar { display: none; }
+        .h-chip { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+        .h-up { background: rgba(0, 255, 136, 0.15); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.3); }
+        .h-down { background: rgba(255, 51, 102, 0.15); color: #ff3366; border: 1px solid rgba(255, 51, 102, 0.3); }
+
+        /* TP / SL Row */
+        .tpsl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+        .tpsl-box { background: #111726; border: 1px solid #1d273f; padding: 6px; border-radius: 8px; }
+        .tpsl-title { font-size: 9px; font-weight: 800; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .tpsl-options { display: flex; gap: 4px; }
+        .opt-btn { flex: 1; background: #19233a; border: 1px solid #283759; color: #94a3b8; font-size: 10px; font-weight: 700; padding: 4px 0; border-radius: 4px; cursor: pointer; text-align: center; }
+        .opt-btn.active-tp { background: #00ff88; color: #000; border-color: #00ff88; }
+        .opt-btn.active-sl { background: #ff3366; color: #fff; border-color: #ff3366; }
+
+        /* Action Buttons */
+        .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .act-btn { height: 50px; border-radius: 10px; border: none; font-size: 16px; font-weight: 900; letter-spacing: 1px; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+        .btn-down { background: #ff3366; color: #fff; box-shadow: 0 4px 15px rgba(255, 51, 102, 0.3); }
+        .btn-up { background: #00ff88; color: #000; box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3); }
+
+        /* Stake Bar */
+        .stake-bar { background: #111728; border: 1px solid #1c2742; border-radius: 10px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; }
+        .stake-left { display: flex; align-items: center; gap: 6px; }
+        .chip-btn { background: #1c2740; border: 1px solid #2b3b5f; color: #fff; font-size: 11px; font-weight: bold; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+        .stake-input { background: transparent; border: none; color: #00ff88; font-size: 15px; font-weight: 800; width: 70px; text-align: right; outline: none; }
+
+        /* Settings Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
+        .retro-modal { width: 310px; background: #182030; border: 2px solid #2d3c5e; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 15px; letter-spacing: 0.5px; border-bottom: 1px solid #283754; padding-bottom: 8px; }
+        .close-m { background: #25334f; border: none; color: #fff; font-size: 14px; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .m-item { background: #202b42; border: 1px solid #2e3e61; padding: 9px; border-radius: 6px; font-size: 12px; font-weight: 700; text-align: center; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="top-nav">
+        <div class="logo">RETRO <span>TRADER</span></div>
+        <div class="right-nav">
+            <div class="fee-badge">2% FEE</div>
+            <button class="menu-btn" onclick="toggleModal('settingsModal', true)">☰</button>
+        </div>
+    </div>
+
+    <div class="wallet-card">
+        <div>
+            <div style="font-size: 10px; color: #7e93b8;">WALLET BALANCE</div>
+            <div class="wallet-bal" id="walletBal">₹1000.00</div>
+        </div>
+        <div class="wallet-btns">
+            <button class="w-btn dep-btn" onclick="openDeposit()">+ DEPOSIT</button>
+            <button class="w-btn with-btn" onclick="openWithdraw()">WITHDRAW</button>
+        </div>
+    </div>
+
+    <div class="round-bar">
+        <div class="side-pool">
+            <div class="players">1,398 players</div>
+            <div class="percent pool-down">50%</div>
+        </div>
+
+        <div class="dial-container">
+            <div class="dial-circle">
+                <div class="dial-sec" id="dialSec">20</div>
+                <div class="dial-lbl">SEC</div>
+            </div>
+            <div class="phase-badge phase-betting" id="phaseBadge">BETTING (20S)</div>
+        </div>
+
+        <div class="side-pool">
+            <div class="players">1,394 players</div>
+            <div class="percent pool-up">50%</div>
+        </div>
+    </div>
+
+    <div class="chart-box">
+        <canvas id="traderCanvas"></canvas>
+        <button class="cashout-btn" id="cashoutBtn" onclick="triggerCashout()">⚡ CASHOUT (+₹0.00)</button>
+    </div>
+
+    <div class="history-strip" id="historyStrip">
+        <div class="h-chip h-down">▼ -31%</div>
+        <div class="h-chip h-up">▲ +71%</div>
+        <div class="h-chip h-up">▲ +35%</div>
+        <div class="h-chip h-down">▼ -54%</div>
+        <div class="h-chip h-up">▲ +96%</div>
+        <div class="h-chip h-down">▼ -18%</div>
+    </div>
+
+    <div class="tpsl-row">
+        <div class="tpsl-box">
+            <div class="tpsl-title"><span style="color:#ff3366;">SL CUT (LOSS GUARD)</span> <span id="slLabel">OFF</span></div>
+            <div class="tpsl-options">
+                <div class="opt-btn" onclick="setSL(0, this)">OFF</div>
+                <div class="opt-btn" onclick="setSL(-20, this)">-20%</div>
+                <div class="opt-btn" onclick="setSL(-40, this)">-40%</div>
+                <div class="opt-btn" onclick="setSL(-60, this)">-60%</div>
+            </div>
+        </div>
+        <div class="tpsl-box">
+            <div class="tpsl-title"><span style="color:#00ff88;">TP TARGET (PROFIT)</span> <span id="tpLabel">OFF</span></div>
+            <div class="tpsl-options">
+                <div class="opt-btn" onclick="setTP(0, this)">OFF</div>
+                <div class="opt-btn" onclick="setTP(30, this)">+30%</div>
+                <div class="opt-btn" onclick="setTP(50, this)">+50%</div>
+                <div class="opt-btn" onclick="setTP(100, this)">+100%</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-row">
+        <button class="act-btn btn-down" onclick="placeBet('DOWN')">▼ DOWN</button>
+        <button class="act-btn btn-up" onclick="placeBet('UP')">▲ UP</button>
+    </div>
+
+    <div class="stake-bar">
+        <div class="stake-left">
+            <button class="chip-btn" onclick="setStake(10)">₹10</button>
+            <button class="chip-btn" onclick="setStake(50)">₹50</button>
+            <button class="chip-btn" onclick="setStake(100)">₹100</button>
+            <button class="chip-btn" onclick="setStake(500)">₹500</button>
+        </div>
+        <div>
+            <span style="font-size: 11px; color: #7e93b8; font-weight: bold;">STAKE:</span>
+            <input type="number" class="stake-input" id="stakeVal" value="10">
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="settingsModal">
+    <div class="retro-modal">
+        <div class="modal-header">
+            <span>SETTINGS</span>
+            <button class="close-m" onclick="toggleModal('settingsModal', false)">✕</button>
+        </div>
+        <div class="m-item" onclick="alert('Round runs 20s betting, then 20s live wave. Use TP/SL to lock profit!')">ℹ How to play</div>
+        <div class="m-item">📊 Round Stats</div>
+        <div class="m-item">🕒 Trade History</div>
+        <div class="m-item" onclick="toggleModal('settingsModal', false)">🏠 Return to Arena</div>
+    </div>
+</div>
+
+<script>
+    // --- Live Supabase Handshake ---
+    const SUPABASE_URL = "https://aurngocyiuukmegaomqk.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_yQwLIpVJAGKn4WKGmqADmg_Y8nzR1YA";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const CYCLE_DURATION = 40;
+    const BETTING_DURATION = 20;
+    
+    let wallet = 1000.00;
+    let selectedTP = 0;
+    let selectedSL = 0;
+    let activeBet = null;
+    let livePercent = 0;
+    let currentUser = null;
+
+    const canvas = document.getElementById('traderCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resize() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Supabase User Initialization
+    async function initUser() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('app_users')
+                .select('*')
+                .eq('phone_or_email', 'user@retrotrader.com')
+                .single();
+            if (data) {
+                currentUser = data;
+                wallet = parseFloat(data.wallet_balance);
+                updateWalletUI();
+            }
+        } catch (e) {
+            console.log("Database synced locally:", e);
+        }
+    }
+    initUser();
+
+    function setStake(v) { document.getElementById('stakeVal').value = v; }
+    function setTP(val, el) {
+        selectedTP = val;
+        document.getElementById('tpLabel').innerText = val ? '+' + val + '%' : 'OFF';
+        el.parentElement.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active-tp'));
+        el.classList.add('active-tp');
+    }
+    function setSL(val, el) {
+        selectedSL = val;
+        document.getElementById('slLabel').innerText = val ? val + '%' : 'OFF';
+        el.parentElement.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active-sl'));
+        el.classList.add('active-sl');
+    }
+    function toggleModal(id, show) {
+        document.getElementById(id).style.display = show ? 'flex' : 'none';
+    }
+
+    function getWavePoint(roundNum, progress) {
+        let seed = Math.sin(roundNum * 999 + progress * 8) * 10000;
+        let val = (seed - Math.floor(seed)) * 140 - 70;
+        return Math.round(val);
+    }
+
+    function engineLoop() {
+        const nowSec = Date.now() / 1000;
+        const cycleSec = nowSec % CYCLE_DURATION;
+        const currentRound = Math.floor(nowSec / CYCLE_DURATION);
+
+        const isBettingPhase = cycleSec < BETTING_DURATION;
+        const remainingSec = isBettingPhase 
+            ? Math.floor(BETTING_DURATION - cycleSec) 
+            : Math.floor(CYCLE_DURATION - cycleSec);
+
+        document.getElementById('dialSec').innerText = remainingSec;
+        const badge = document.getElementById('phaseBadge');
+        const cashoutBtn = document.getElementById('cashoutBtn');
+
+        if (isBettingPhase) {
+            badge.innerText = "BETTING (" + remainingSec + "S)";
+            badge.className = "phase-badge phase-betting";
+            cashoutBtn.style.display = "none";
+            livePercent = 0;
+        } else {
+            badge.innerText = "PLAY BET (" + remainingSec + "S)";
+            badge.className = "phase-badge phase-play";
+
+            const waveProgress = (cycleSec - BETTING_DURATION) / (CYCLE_DURATION - BETTING_DURATION);
+            livePercent = getWavePoint(currentRound, waveProgress);
+
+            if (activeBet && !activeBet.settled) {
+                cashoutBtn.style.display = "block";
+                let isFavorable = (activeBet.direction === 'UP' && livePercent > 0) || (activeBet.direction === 'DOWN' && livePercent < 0);
+                let multiplier = Math.abs(livePercent) / 100;
+                let currentProfit = isFavorable ? (activeBet.stake * multiplier) : -(activeBet.stake * multiplier);
+                
+                cashoutBtn.innerText = currentProfit >= 0 
+                    ? `⚡ CASHOUT (+₹${currentProfit.toFixed(2)})` 
+                    : `⚡ CUT LOSS (-₹${Math.abs(currentProfit).toFixed(2)})`;
+
+                if (activeBet.tp > 0 && Math.abs(livePercent) >= activeBet.tp && isFavorable) {
+                    settleBet(true, activeBet.stake * (1 + activeBet.tp / 100));
+                }
+                if (activeBet.sl < 0 && Math.abs(livePercent) >= Math.abs(activeBet.sl) && !isFavorable) {
+                    settleBet(false, activeBet.stake * (1 - Math.abs(activeBet.sl) / 100));
+                }
+            }
+        }
+
+        drawChart(isBettingPhase);
+
+        if (remainingSec === 0 && !isBettingPhase && activeBet && !activeBet.settled) {
+            let win = (activeBet.direction === 'UP' && livePercent > 0) || (activeBet.direction === 'DOWN' && livePercent < 0);
+            let payout = win ? activeBet.stake * 1.96 : 0;
+            settleBet(win, payout);
+        }
+
+        requestAnimationFrame(engineLoop);
+    }
+
+    function drawChart(isBetting) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const midY = canvas.height / 2;
+
+        ctx.strokeStyle = '#202c47';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(0, midY);
+        ctx.lineTo(canvas.width, midY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        if (selectedTP > 0) {
+            const tpY = midY - (selectedTP / 100) * (midY * 0.8);
+            ctx.strokeStyle = 'rgba(0, 255, 136, 0.4)';
+            ctx.setLineDash([6, 6]);
+            ctx.beginPath();
+            ctx.moveTo(0, tpY);
+            ctx.lineTo(canvas.width, tpY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        if (selectedSL < 0) {
+            const slY = midY + (Math.abs(selectedSL) / 100) * (midY * 0.8);
+            ctx.strokeStyle = 'rgba(255, 51, 102, 0.4)';
+            ctx.setLineDash([6, 6]);
+            ctx.beginPath();
+            ctx.moveTo(0, slY);
+            ctx.lineTo(canvas.width, slY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        ctx.beginPath();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = livePercent >= 0 ? '#00ff88' : '#ff3366';
+
+        if (isBetting) {
+            ctx.moveTo(0, midY);
+            ctx.lineTo(canvas.width, midY);
+            ctx.stroke();
+        } else {
+            ctx.moveTo(0, midY);
+            const targetY = midY - (livePercent / 100) * (midY * 0.8);
+            ctx.quadraticCurveTo(canvas.width / 2, midY, canvas.width - 20, targetY);
+            ctx.stroke();
+
+            ctx.fillStyle = livePercent >= 0 ? '#00ff88' : '#ff3366';
+            ctx.beginPath();
+            ctx.arc(canvas.width - 20, targetY, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.font = 'bold 12px monospace';
+            ctx.fillText((livePercent >= 0 ? '+' : '') + livePercent + '%', canvas.width - 65, targetY - 12);
+        }
+    }
+
+    async function placeBet(direction) {
+        const stake = parseFloat(document.getElementById('stakeVal').value);
+        if (wallet < stake) return alert('Insufficient balance!');
+        if (activeBet && !activeBet.settled) return alert('Bet already locked for this round!');
+
+        wallet -= stake;
+        updateWalletUI();
+
+        activeBet = { direction, stake, tp: selectedTP, sl: selectedSL, settled: false };
+
+        if (currentUser) {
+            await supabaseClient.from('app_users').update({ wallet_balance: wallet }).eq('id', currentUser.id);
+            await supabaseClient.from('bets').insert({
+                user_id: currentUser.id,
+                round_number: Math.floor(Date.now() / 40000),
+                bet_type: direction,
+                stake_amount: stake,
+                tp_target: selectedTP,
+                sl_cut: selectedSL,
+                status: 'LOCKED'
+            });
+        }
+        alert(`Bet Placed: ${direction} (₹${stake})`);
+    }
+
+    function triggerCashout() {
+        if (!activeBet || activeBet.settled) return;
+        let isFavorable = (activeBet.direction === 'UP' && livePercent > 0) || (activeBet.direction === 'DOWN' && livePercent < 0);
+        let multiplier = Math.abs(livePercent) / 100;
+        let payout = isFavorable ? activeBet.stake * (1 + multiplier) : Math.max(0, activeBet.stake * (1 - multiplier));
+        settleBet(isFavorable, payout);
+    }
+
+    async function settleBet(won, payout) {
+        activeBet.settled = true;
+        wallet += payout;
+        updateWalletUI();
+        document.getElementById('cashoutBtn').style.display = 'none';
+
+        if (currentUser) {
+            await supabaseClient.from('app_users').update({ wallet_balance: wallet }).eq('id', currentUser.id);
+        }
+        alert(won ? `🎉 WON! Payout: ₹${payout.toFixed(2)}` : `Safe Exit / Loss: Returned ₹${payout.toFixed(2)}`);
+    }
+
+    function updateWalletUI() {
+        document.getElementById('walletBal').innerText = `₹${wallet.toFixed(2)}`;
+    }
+
+    async function openDeposit() {
+        let amt = prompt("Enter deposit amount (₹):", "500");
+        if (amt && !isNaN(amt)) {
+            wallet += parseFloat(amt);
+            updateWalletUI();
+            if (currentUser) {
+                await supabaseClient.from('app_users').update({ wallet_balance: wallet }).eq('id', currentUser.id);
+                await supabaseClient.from('transactions').insert({
+                    user_id: currentUser.id,
+                    type: 'DEPOSIT',
+                    amount: parseFloat(amt),
+                    status: 'COMPLETED'
+                });
+            }
+            alert(`✅ ₹${amt} deposited instantly via UPI!`);
+        }
+    }
+
+    async function openWithdraw() {
+        let upi = prompt("Enter UPI VPA (e.g. name@okhdfcbank):");
+        if (upi) {
+            let amt = prompt("Enter withdrawal amount (Min ₹100):", "200");
+            if (amt && parseFloat(amt) <= wallet) {
+                wallet -= parseFloat(amt);
+                updateWalletUI();
+                if (currentUser) {
+                    await supabaseClient.from('app_users').update({ wallet_balance: wallet }).eq('id', currentUser.id);
+                    await supabaseClient.from('transactions').insert({
+                        user_id: currentUser.id,
+                        type: 'WITHDRAWAL',
+                        amount: parseFloat(amt),
+                        upi_id: upi,
+                        status: 'COMPLETED'
+                    });
+                }
+                alert(`✅ Withdrawal for ₹${amt} processed to ${upi}!`);
+            } else {
+                alert("Invalid amount or low balance.");
+            }
+        }
+    }
+
+    requestAnimationFrame(engineLoop);
+</script>
+</body>
+</html>
